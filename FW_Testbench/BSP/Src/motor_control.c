@@ -61,7 +61,8 @@ int generateRandomAngle(){
 void MotorControl_Init(void)
 {
     // Initializes all stepper motors (PWM, Direction GPIO and Enable GPIO)
-	for(int i=0;i<NUMBER_MOTOR;i++){
+	for(int i=0;i<NUMBER_MOTOR;i++)
+	{
 		Motors[i].motor_direction = MOTOR_DIRECTION_CLOCKWISE;
 		Motors[i].nb_pulse = 0u;
 		Motors[i].delay = 0u;
@@ -156,20 +157,37 @@ Motor_State MotorControl_Task(void)
      */
     for (uint8_t i = 0; i < NUMBER_MOTOR-3; i++)
     {
-    	motor_idx = i;
+    	motor_idx = i;	//?????
         HAL_Delay(1000);
 
 
         Data_Motor* currentData = &data_structure->Data_Motors[i];
         Motor* currentMotor     = &Motors[i];
-
+        ///////////////////////////////////////////////////////////////////// Changed code
         int16_t difference_deg =
             currentData->motor_angle_to_reach_deg -
             currentData->motor_current_angle_deg;
 
-        if (difference_deg != 0)
+        //prototype
+        //int16_t target_angle = 360 - difference_deg;
+
+        if (currentData->motor_angle_to_reach_deg < 0)	// Forced CCW turn - NOT OPTIMIZED
         {
-            Modify_Direction(difference_deg, currentMotor);
+
+        	currentMotor->motor_direction = 1; //CCW
+        	Modify_Speed( abs(motor_angle_to_reach),	//
+                    currentData->motor_desired_speed_percent,
+                    currentMotor);
+
+        	currentData->motor_current_angle_deg =
+        	                currentData->motor_angle_to_reach_deg;
+
+        }
+
+        if (currentData->motor_angle_to_reach_deg > 0 && difference_deg < 180)
+        {
+
+            //Modify_Direction(difference_deg, currentMotor);
             Modify_Speed(difference_deg,
                          currentData->motor_desired_speed_percent,
                          currentMotor);
@@ -177,6 +195,21 @@ Motor_State MotorControl_Task(void)
             currentData->motor_current_angle_deg =
                 currentData->motor_angle_to_reach_deg;
         }
+
+        if (currentData->motor_angle_to_reach_deg > 0 && difference_deg > 180)
+                {
+
+        			currentMotor->motor_direction = 1; //CCW
+                    //Modify_Direction(difference_deg, currentMotor);
+                    Modify_Speed( (360 - difference_deg) ,			// optimized movement
+                                 currentData->motor_desired_speed_percent,
+                                 currentMotor);
+
+                    currentData->motor_current_angle_deg =
+                        currentData->motor_angle_to_reach_deg;
+                }
+
+        currentMotor->motor_direction = 0; // reset the direction no matter what it was before
     }
 
     // 3) Update our snapshot with the new angles
@@ -247,7 +280,7 @@ static void Modify_Speed(int16_t difference_deg, uint32_t motor_speed_desired_pe
 }
 
 /**
- * @brief Modifies the direction signal of a motor based on the given difference in degrees.
+ * @brief [Should be deprecated gradually] Modifies the direction signal of a motor based on the given difference in degrees.
  *
  * This function updates the direction of the motor based on the difference in degrees.
  * If the difference is negative, the motor direction is set to counter-clockwise.
